@@ -35,12 +35,14 @@ class LockActivity : AppCompatActivity() {
     private var mode: String = "VERIFY"
     private var isOwnerRegistered: Boolean = false
     private var isProcessing = false
+    private lateinit var faceNetModel: FaceNetModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityLockBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        faceNetModel = FaceNetModel(this)
         mode = intent.getStringExtra("MODE") ?: "VERIFY"
         isOwnerRegistered = File(getExternalFilesDir(null), "owner_face.dat").exists()
 
@@ -132,10 +134,11 @@ class LockActivity : AppCompatActivity() {
 
             val imageAnalyzer = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setTargetRotation(binding.viewFinder.display.rotation)
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, FaceAnalyzer { face ->
-                        onFaceDetected(face)
+                    it.setAnalyzer(cameraExecutor, FaceAnalyzer { face, bitmap ->
+                        onFaceDetected(face, bitmap)
                     })
                 }
 
@@ -152,24 +155,24 @@ class LockActivity : AppCompatActivity() {
     }
 
     private var lastDetectedFace: Face? = null
+    private var lastDetectedBitmap: Bitmap? = null
 
-    private fun onFaceDetected(face: Face?) {
+    private fun onFaceDetected(face: Face?, bitmap: Bitmap?) {
         lastDetectedFace = face
+        lastDetectedBitmap = bitmap
         if (mode == "REGISTER" || isProcessing) {
             return
         }
 
-        if (face != null) {
-            if (verifyFace(face)) {
+        if (face != null && bitmap != null) {
+            if (verifyFace(face, bitmap)) {
                 isProcessing = true
                 runOnUiThread {
                     Toast.makeText(this, "Owner Verified", Toast.LENGTH_SHORT).show()
                     unlockSuccess()
                 }
             } else {
-                // Potential intruder or different face
                 Log.d("LockActivity", "Face match failed - possible intruder")
-                // Only capture photo every 5 seconds to avoid flooding
                 if (System.currentTimeMillis() % 5000 < 500) {
                    captureIntruderPhoto()
                 }
@@ -177,67 +180,50 @@ class LockActivity : AppCompatActivity() {
         }
     }
 
-    private fun verifyFace(face: Face): Boolean {
+    private fun verifyFace(face: Face, bitmap: Bitmap): Boolean {
         if (!isOwnerRegistered) return false
         
         val sharedPrefs = getSharedPreferences("AppLockPrefs", Context.MODE_PRIVATE)
-        val savedSignature = sharedPrefs.getString("OwnerFaceSignature", null) ?: return false
+        val savedEmbeddingString = sharedPrefs.getString("OwnerFaceEmbedding", null) ?: return false
         
-        val currentSignature = getFaceSignature(face)
-        val savedValues = savedSignature.split(",").map { it.toFloat() }
-        val currentValues = currentSignature.split(",").map { it.toFloat() }
+        val faceBitmap = cropFace(bitmap, face) ?: return false
+        val currentEmbedding = faceNetModel.getFaceEmbedding(faceBitmap)
         
-        // Compare landmark ratios (more stable than absolute positions)
-        var diff = 0f
-        for (i in savedValues.indices) {
-            diff += kotlin.math.abs(savedValues[i] - currentValues[i])
+        val savedEmbedding = savedEmbeddingString.split(",").map { it.toFloat() }.toFloatArray()
+        
+        val distance = faceNetModel.compare(currentEmbedding, savedEmbedding)
+        Log.d("LockActivity", "Face distance: $distance")
+        
+        return distance < 1.0f // Threshold for FaceNet (Euclidean distance)
+    }
+
+    private fun cropFace(bitmap: Bitmap, face: Face): Bitmap? {
+        val rect = face.boundingBox
+        val x = rect.left.coerceAtLeast(0)
+        val y = rect.top.coerceAtLeast(0)
+        val width = rect.width().coerceAtMost(bitmap.width - x)
+        val height = rect.height().coerceAtMost(bitmap.height - y)
+        return if (width > 0 && height > 0) {
+            Bitmap.createBitmap(bitmap, x, y, width, height)
+        } else {
+            null
         }
-        
-        Log.d("LockActivity", "Face diff: $diff")
-        val isVerified = diff < 0.12f // Relaxed from 0.05, still tighter than 0.15
-        return isVerified
-    }
-
-    private fun getFaceSignature(face: Face): String {
-        // Use ratios of distances between landmarks to create a unique-ish signature
-        val leftEye = face.getLandmark(FaceLandmark.LEFT_EYE)?.position ?: PointF(0f, 0f)
-        val rightEye = face.getLandmark(FaceLandmark.RIGHT_EYE)?.position ?: PointF(0f, 0f)
-        val nose = face.getLandmark(FaceLandmark.NOSE_BASE)?.position ?: PointF(0f, 0f)
-        val mouthLeft = face.getLandmark(FaceLandmark.MOUTH_LEFT)?.position ?: PointF(0f, 0f)
-        val mouthRight = face.getLandmark(FaceLandmark.MOUTH_RIGHT)?.position ?: PointF(0f, 0f)
-        val mouthBottom = face.getLandmark(FaceLandmark.MOUTH_BOTTOM)?.position ?: PointF(0f, 0f)
-
-        val eyeDist = dist(leftEye, rightEye)
-        val eyeToNose = dist(midPoint(leftEye, rightEye), nose)
-        val noseToMouth = dist(nose, mouthBottom)
-        val mouthWidth = dist(mouthLeft, mouthRight)
-
-        // Ratios are scale-invariant
-        val r1 = if (eyeDist > 0) eyeToNose / eyeDist else 0f
-        val r2 = if (eyeDist > 0) noseToMouth / eyeDist else 0f
-        val r3 = if (eyeDist > 0) mouthWidth / eyeDist else 0f
-        
-        return "$r1,$r2,$r3"
-    }
-
-    private fun midPoint(p1: PointF, p2: PointF): PointF {
-        return PointF((p1.x + p2.x) / 2f, (p1.y + p2.y) / 2f)
-    }
-
-    private fun dist(p1: PointF, p2: PointF): Float {
-        return sqrt((p1.x - p2.x).pow(2) + (p1.y - p2.y).pow(2))
     }
 
     private fun saveOwnerPattern() {
         val face = lastDetectedFace
-        if (face == null) {
+        val bitmap = lastDetectedBitmap
+        if (face == null || bitmap == null) {
             Toast.makeText(this, "No face detected!", Toast.LENGTH_SHORT).show()
             return
         }
 
-        val signature = getFaceSignature(face)
+        val faceBitmap = cropFace(bitmap, face) ?: return
+        val embedding = faceNetModel.getFaceEmbedding(faceBitmap)
+        val embeddingString = embedding.joinToString(",")
+        
         val sharedPrefs = getSharedPreferences("AppLockPrefs", Context.MODE_PRIVATE)
-        sharedPrefs.edit().putString("OwnerFaceSignature", signature).apply()
+        sharedPrefs.edit().putString("OwnerFaceEmbedding", embeddingString).apply()
 
         val file = File(getExternalFilesDir(null), "owner_face.dat")
         file.writeText("REGISTERED") 
@@ -315,11 +301,10 @@ class LockActivity : AppCompatActivity() {
         private val REQUIRED_PERMISSIONS = arrayOf(android.Manifest.permission.CAMERA)
     }
 
-    private class FaceAnalyzer(private val listener: (Face?) -> Unit) : ImageAnalysis.Analyzer {
+    private class FaceAnalyzer(private val listener: (Face?, Bitmap?) -> Unit) : ImageAnalysis.Analyzer {
         private val detector = FaceDetection.getClient(
             FaceDetectorOptions.Builder()
                 .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
-                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_ALL)
                 .build()
         )
 
@@ -330,7 +315,13 @@ class LockActivity : AppCompatActivity() {
                 val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
                 detector.process(image)
                     .addOnSuccessListener { faces ->
-                        listener(faces.firstOrNull())
+                        val face = faces.firstOrNull()
+                        if (face != null) {
+                            val bitmap = imageProxy.toBitmap()
+                            listener(face, bitmap)
+                        } else {
+                            listener(null, null)
+                        }
                     }
                     .addOnCompleteListener {
                         imageProxy.close()

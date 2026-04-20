@@ -128,11 +128,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startAppLockService() {
+        val sharedPrefs = getSharedPreferences("AppLockPrefs", Context.MODE_PRIVATE)
+        sharedPrefs.edit().putBoolean("ServiceEnabled", true).apply()
         val intent = Intent(this, AppLockService::class.java)
         startForegroundService(intent)
     }
 
     private fun stopAppLockService() {
+        val sharedPrefs = getSharedPreferences("AppLockPrefs", Context.MODE_PRIVATE)
+        sharedPrefs.edit().putBoolean("ServiceEnabled", false).apply()
         stopService(Intent(this, AppLockService::class.java))
         Toast.makeText(this, "AppLock Service Stopped", Toast.LENGTH_SHORT).show()
     }
