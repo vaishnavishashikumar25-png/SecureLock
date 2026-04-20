@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:ns1="http://schemas.android.com/tools">
+    <string name="app_name">AppLock Pro</string>
+    <string name="auth_face">Authenticating Face…</string>
+    <string name="auth_pin">Enter PIN to Unlock</string>
+    <string name="cancel">Cancel</string>
+    <string name="face_id">Face ID</string>
+    <string name="intruder_history">Intruder History</string>
+    <string name="lock_message">This app is locked. Scan face to enter.</string>
+    <string name="management">Management</string>
+    <string name="protected_apps">Protected Applications</string>
+    <string name="request_permissions">Grant Permissions</string>
+    <string name="security_pin">Security PIN</string>
+    <string name="security_settings">Security Settings</string>
+    <string name="status_active">Protection Active</string>
+    <string name="status_desc_active">Your apps are being monitored</string>
+    <string name="status_desc_disabled">Tap to enable service</string>
+    <string name="status_disabled">Protection Disabled</string>
+    <string name="use_pin">Use PIN</string>
+    <style name="Theme.AppLock" parent="Theme.Material3.DayNight.NoActionBar">
+        
+        <item name="colorPrimary">#2196F3</item>
+        <item name="colorOnPrimary">#FFFFFF</item>
+        <item name="colorPrimaryContainer">#D1E4FF</item>
+        <item name="colorOnPrimaryContainer">#001D36</item>
+
+        
+        <item name="colorSecondary">#3F51B5</item>
+        <item name="colorOnSecondary">#FFFFFF</item>
+
+        
+        <item name="android:statusBarColor">#F5F5F5</item>
+        <item name="android:windowLightStatusBar" ns1:targetApi="m">true</item>
+        <item name="android:navigationBarColor">#F5F5F5</item>
+        <item name="android:windowLightNavigationBar" ns1:targetApi="27">true</item>
+
+        <item name="android:windowBackground">#F5F5F5</item>
+    </style>
+    <style name="Theme.AppLock.NoActionBar" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowBackground">#121212</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+</resources>

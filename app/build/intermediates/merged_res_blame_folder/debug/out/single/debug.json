@@ -1,0 +1,26 @@
+[
+    {
+        "merged": "com.vaish.applock.app-merged_res-38:/layout_activity_main.xml.flat",
+        "source": "com.vaish.applock.app-main-40:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.vaish.applock.app-merged_res-38:/layout_activity_history.xml.flat",
+        "source": "com.vaish.applock.app-main-40:/layout/activity_history.xml"
+    },
+    {
+        "merged": "com.vaish.applock.app-merged_res-38:/xml_backup_rules.xml.flat",
+        "source": "com.vaish.applock.app-main-40:/xml/backup_rules.xml"
+    },
+    {
+        "merged": "com.vaish.applock.app-merged_res-38:/xml_data_extraction_rules.xml.flat",
+        "source": "com.vaish.applock.app-main-40:/xml/data_extraction_rules.xml"
+    },
+    {
+        "merged": "com.vaish.applock.app-merged_res-38:/layout_item_intruder.xml.flat",
+        "source": "com.vaish.applock.app-main-40:/layout/item_intruder.xml"
+    },
+    {
+        "merged": "com.vaish.applock.app-merged_res-38:/layout_activity_lock.xml.flat",
+        "source": "com.vaish.applock.app-main-40:/layout/activity_lock.xml"
+    }
+]

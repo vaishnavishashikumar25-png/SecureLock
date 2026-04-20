@@ -1,0 +1,23 @@
+<resources>
+    <string name="app_name">AppLock Pro</string>
+    <string name="request_permissions">Grant Permissions</string>
+    <string name="lock_message">This app is locked. Scan face to enter.</string>
+
+    <string name="status_active">Protection Active</string>
+    <string name="status_disabled">Protection Disabled</string>
+    <string name="status_desc_active">Your apps are being monitored</string>
+    <string name="status_desc_disabled">Tap to enable service</string>
+
+    <string name="security_settings">Security Settings</string>
+    <string name="security_pin">Security PIN</string>
+    <string name="face_id">Face ID</string>
+
+    <string name="management">Management</string>
+    <string name="protected_apps">Protected Applications</string>
+    <string name="intruder_history">Intruder History</string>
+
+    <string name="auth_face">Authenticating Face…</string>
+    <string name="auth_pin">Enter PIN to Unlock</string>
+    <string name="cancel">Cancel</string>
+    <string name="use_pin">Use PIN</string>
+</resources>
