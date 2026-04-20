@@ -11,6 +11,8 @@ import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.switchmaterial.SwitchMaterial
 
@@ -107,10 +109,18 @@ class MainActivity : AppCompatActivity() {
 
         val overlayGranted = Settings.canDrawOverlays(this)
 
-        return usageStatsGranted && overlayGranted
+        val cameraGranted = ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) == 
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        return usageStatsGranted && overlayGranted && cameraGranted
     }
 
     private fun requestPermissions() {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) != 
+            android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.CAMERA), 100)
+        }
+
         if (!Settings.canDrawOverlays(this)) {
             val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, 
                 Uri.parse("package:$packageName"))
@@ -124,6 +134,21 @@ class MainActivity : AppCompatActivity() {
         if (mode != AppOpsManager.MODE_ALLOWED) {
             startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
             Toast.makeText(this, "Grant Usage Access", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 100) {
+            if (grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                if (checkPermissions()) {
+                    startAppLockService()
+                    updateStatusUI()
+                }
+            } else {
+                Toast.makeText(this, "Camera permission is required for face unlock", Toast.LENGTH_SHORT).show()
+                switchService.isChecked = false
+            }
         }
     }
 

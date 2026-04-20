@@ -27,7 +27,10 @@ class AppLockService : Service() {
         createNotificationChannel()
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(1, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+            startForeground(1, createNotification(), 
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            startForeground(1, createNotification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA)
         } else {
             startForeground(1, createNotification())
         }
@@ -46,20 +49,26 @@ class AppLockService : Service() {
         timer = Timer()
         timer?.scheduleAtFixedRate(object : TimerTask() {
             override fun run() {
-                updateLockedPackages() // Refresh list occasionally
+                updateLockedPackages()
+                
                 val currentApp = getForegroundApp() ?: return
+                
+                // If our own app is in foreground (either main app or lock screen), do nothing
+                if (currentApp == packageName) {
+                    return
+                }
                 
                 // If the current app is the one we just unlocked, don't show lock screen
                 if (currentApp == lastUnlockedApp) {
                     return
                 }
 
-                // If the user switched to a different app (not our app), reset the last unlocked app
-                if (lastUnlockedApp != null && currentApp != lastUnlockedApp && !lockedPackages.contains(currentApp) && currentApp != packageName) {
+                // Reset lastUnlockedApp if user moves to a different non-locked app
+                if (lastUnlockedApp != null && currentApp != lastUnlockedApp && !lockedPackages.contains(currentApp)) {
                     lastUnlockedApp = null
                 }
 
-                if (lockedPackages.contains(currentApp) && currentApp != packageName) {
+                if (lockedPackages.contains(currentApp)) {
                     showLockScreen(currentApp)
                 }
             }
@@ -73,12 +82,7 @@ class AppLockService : Service() {
         
         if (stats != null && stats.isNotEmpty()) {
             val sortedStats = stats.sortedByDescending { it.lastTimeUsed }
-            // Filter out our own app to find what's underneath
-            for (stat in sortedStats) {
-                if (stat.packageName != packageName) {
-                    return stat.packageName
-                }
-            }
+            // Return the literal top app, including our own
             return sortedStats[0].packageName
         }
         return null

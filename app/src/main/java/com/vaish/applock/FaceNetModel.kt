@@ -4,25 +4,35 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.util.Log
 import org.tensorflow.lite.Interpreter
+import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.MappedByteBuffer
+import java.nio.channels.FileChannel
 import java.util.*
 import kotlin.math.sqrt
 
 class FaceNetModel(context: Context) {
     private var interpreter: Interpreter
     private val imageSize = 112
-    private val outputSize = 192
+    private var outputSize = 192
 
     init {
-        val model = context.assets.open("mobile_face_net.tflite").readBytes()
-        val buffer = ByteBuffer.allocateDirect(model.size)
-        buffer.order(ByteOrder.nativeOrder())
-        buffer.put(model)
-        interpreter = Interpreter(buffer)
+        val modelBuffer = loadModelFile(context, "mobile_face_net.tflite")
+        interpreter = Interpreter(modelBuffer)
         
         val outputShape = interpreter.getOutputTensor(0).shape()
-        Log.d("FaceNetModel", "Output shape: ${Arrays.toString(outputShape)}")
+        outputSize = outputShape[1]
+        Log.d("FaceNetModel", "Detected output size: $outputSize")
+    }
+
+    private fun loadModelFile(context: Context, modelPath: String): MappedByteBuffer {
+        val fileDescriptor = context.assets.openFd(modelPath)
+        val inputStream = FileInputStream(fileDescriptor.fileDescriptor)
+        val fileChannel = inputStream.channel
+        val startOffset = fileDescriptor.startOffset
+        val declaredLength = fileDescriptor.declaredLength
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
     }
 
     fun getFaceEmbedding(bitmap: Bitmap): FloatArray {
