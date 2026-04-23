@@ -14,16 +14,21 @@ import kotlin.math.sqrt
 
 class FaceNetModel(context: Context) {
     private var interpreter: Interpreter
-    private val imageSize = 112
-    private var outputSize = 192
+    private val imageSize = 160
+    private var outputSize = 512
 
     init {
-        val modelBuffer = loadModelFile(context, "mobile_face_net.tflite")
-        interpreter = Interpreter(modelBuffer)
-        
-        val outputShape = interpreter.getOutputTensor(0).shape()
-        outputSize = outputShape[1]
-        Log.d("FaceNetModel", "Detected output size: $outputSize")
+        try {
+            val modelBuffer = loadModelFile(context, "facenet.tflite")
+            interpreter = Interpreter(modelBuffer)
+            
+            val outputShape = interpreter.getOutputTensor(0).shape()
+            outputSize = outputShape[1]
+            Log.d("FaceNetModel", "Detected model output size: $outputSize")
+        } catch (e: Exception) {
+            Log.e("FaceNetModel", "CRITICAL ERROR: Could not load TFLite model. Ensure facenet.tflite is a valid binary file in assets.", e)
+            throw RuntimeException("Invalid Model File: Ensure you downloaded the RAW facenet.tflite file and not the HTML page.", e)
+        }
     }
 
     private fun loadModelFile(context: Context, modelPath: String): MappedByteBuffer {
@@ -51,7 +56,7 @@ class FaceNetModel(context: Context) {
 
         val output = Array(1) { FloatArray(outputSize) }
         interpreter.run(input, output)
-        return output[0]
+        return l2Normalize(output[0])
     }
 
     fun compare(embedding1: FloatArray, embedding2: FloatArray): Float {
@@ -61,5 +66,14 @@ class FaceNetModel(context: Context) {
             distance += diff * diff
         }
         return sqrt(distance)
+    }
+
+    // L2 Normalization often helps with FaceNet models
+    private fun l2Normalize(v: FloatArray): FloatArray {
+        var sum = 0f
+        for (f in v) sum += f * f
+        val mag = sqrt(sum)
+        for (i in v.indices) v[i] = v[i] / mag
+        return v
     }
 }

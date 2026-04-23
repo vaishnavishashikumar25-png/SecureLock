@@ -132,9 +132,15 @@ class LockActivity : AppCompatActivity() {
 
             imageCapture = ImageCapture.Builder().build()
 
+            val rotation = try {
+                binding.viewFinder.display?.rotation ?: android.view.Surface.ROTATION_0
+            } catch (e: Exception) {
+                android.view.Surface.ROTATION_0
+            }
+
             val imageAnalyzer = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                .setTargetRotation(binding.viewFinder.display.rotation)
+                .setTargetRotation(rotation)
                 .build()
                 .also {
                     it.setAnalyzer(cameraExecutor, FaceAnalyzer { face, bitmap ->
@@ -194,7 +200,7 @@ class LockActivity : AppCompatActivity() {
         val distance = faceNetModel.compare(currentEmbedding, savedEmbedding)
         Log.d("LockActivity", "Face distance: $distance")
         
-        return distance < 1.0f // Threshold for FaceNet (Euclidean distance)
+        return distance < 1.1f // Increased threshold for Facenet 512 model
     }
 
     private fun cropFace(bitmap: Bitmap, face: Face): Bitmap? {

@@ -1,3 +1,4 @@
+# Build and IDE files
 *.iml
 .gradle
 /local.properties
@@ -11,4 +12,33 @@
 *.xml.bak
 *.bak
 .vscode/
-node_modules/
+
+# Android specific
+*.ap_
+*.apk
+*.dex
+bin/
+gen/
+
+# Log files
+*.log
+
+# Kotlin/JVM
+.kotlin/
+kotlin-js-store/
+
+# Local configuration
+local.properties
+
+# Secrets
+/app/src/main/assets/owner_face.dat
+/app/src/main/assets/*.key
+secrets.xml
+
+# If you want to exclude large TFLite models (optional, currently commented out)
+# *.tflite
+
+# Gradle
+.gradle/
+build/
+app/build/
