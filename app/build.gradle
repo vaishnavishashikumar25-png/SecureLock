@@ -49,19 +49,18 @@ dependencies {
     implementation 'com.google.android.material:material:1.10.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
 
-    // CameraX dependencies
+    // CameraX
     def camerax_version = "1.4.0"
     implementation "androidx.camera:camera-core:${camerax_version}"
     implementation "androidx.camera:camera-camera2:${camerax_version}"
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
     implementation "androidx.camera:camera-view:${camerax_version}"
 
-    // ML Kit Face Detection
+    // Use ML Kit and its own LiteRT to avoid manual conflicts
     implementation 'com.google.mlkit:face-detection:16.1.7'
-
-    // TensorFlow Lite for Face Recognition
-    implementation 'org.tensorflow:tensorflow-lite:2.17.0'
-    implementation 'org.tensorflow:tensorflow-lite-support:0.4.4'
+    
+    // Instead of org.tensorflow, use the new LiteRT artifacts that ML Kit uses
+    implementation 'com.google.ai.edge.litert:litert:1.0.1'
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'

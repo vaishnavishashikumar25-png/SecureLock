@@ -44,6 +44,22 @@
                 android:textAppearance="@style/TextAppearance.Material3.BodySmall"
                 android:layout_marginTop="4dp" />
 
+            <TextView
+                android:id="@+id/tvUsageTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="App Usage Log:"
+                android:layout_marginTop="8dp"
+                android:visibility="gone"
+                android:textAppearance="@style/TextAppearance.Material3.LabelLarge" />
+
+            <LinearLayout
+                android:id="@+id/llUsageLogs"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="4dp" />
+
         </LinearLayout>
 
         <com.google.android.material.button.MaterialButton

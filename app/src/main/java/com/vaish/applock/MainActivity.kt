@@ -18,17 +18,41 @@ import com.google.android.material.switchmaterial.SwitchMaterial
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var switchService: SwitchMaterial
+    private lateinit var switchService: com.google.android.material.materialswitch.MaterialSwitch
     private lateinit var ivStatus: ImageView
     private lateinit var tvStatusTitle: TextView
     private lateinit var tvStatusDesc: TextView
+    private lateinit var statusPulse: android.view.View
+
+    private var isAuthenticated = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
+        
+        // App-level PIN protection
+        val sharedPrefs = getSharedPreferences("AppLockPrefs", Context.MODE_PRIVATE)
+        val savedPin = sharedPrefs.getString("AppPin", null)
+        
+        if (savedPin != null && !isAuthenticated) {
+            val intent = Intent(this, LockActivity::class.java)
+            intent.putExtra("MODE", "APP_UNLOCK")
+            startActivityForResult(intent, 999)
+        }
 
+        setContentView(R.layout.activity_main)
         setupUI()
         updateStatusUI()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == 999) {
+            if (resultCode == RESULT_OK) {
+                isAuthenticated = true
+            } else {
+                finish() // Close app if unlock failed
+            }
+        }
     }
 
     private fun setupUI() {
@@ -36,6 +60,7 @@ class MainActivity : AppCompatActivity() {
         ivStatus = findViewById(R.id.ivStatus)
         tvStatusTitle = findViewById(R.id.tvStatusTitle)
         tvStatusDesc = findViewById(R.id.tvStatusDesc)
+        statusPulse = findViewById(R.id.statusPulse)
 
         switchService.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
@@ -58,14 +83,6 @@ class MainActivity : AppCompatActivity() {
         findViewById<MaterialCardView>(R.id.btnViewLogs).setOnClickListener {
             startActivity(Intent(this, HistoryActivity::class.java))
         }
-
-        findViewById<MaterialCardView>(R.id.btnSelectApps).setOnClickListener {
-            startActivity(Intent(this, AppListActivity::class.java))
-        }
-
-        findViewById<MaterialCardView>(R.id.btnSetPin).setOnClickListener {
-            startActivity(Intent(this, PinSetupActivity::class.java))
-        }
     }
 
     private fun updateStatusUI() {
@@ -74,15 +91,42 @@ class MainActivity : AppCompatActivity() {
         
         if (isRunning) {
             ivStatus.setImageResource(android.R.drawable.ic_lock_idle_lock)
-            ivStatus.setColorFilter(getColor(android.R.color.holo_green_dark))
-            tvStatusTitle.text = getString(R.string.status_active)
-            tvStatusDesc.text = getString(R.string.status_desc_active)
+            ivStatus.setColorFilter(getColor(R.color.primary))
+            tvStatusTitle.text = "System Protected"
+            tvStatusDesc.text = "Monitoring background activity"
+            startPulseAnimation()
         } else {
             ivStatus.setImageResource(android.R.drawable.ic_lock_lock)
-            ivStatus.setColorFilter(getColor(android.R.color.holo_red_dark))
-            tvStatusTitle.text = getString(R.string.status_disabled)
-            tvStatusDesc.text = getString(R.string.status_desc_disabled)
+            ivStatus.setColorFilter(getColor(R.color.text_secondary))
+            tvStatusTitle.text = "Protection Disabled"
+            tvStatusDesc.text = "Tap to enable security"
+            stopPulseAnimation()
         }
+    }
+
+    private fun startPulseAnimation() {
+        statusPulse.visibility = android.view.View.VISIBLE
+        val scaleX = android.view.animation.ScaleAnimation(1f, 1.5f, 1f, 1.5f, 
+            android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f, 
+            android.view.animation.Animation.RELATIVE_TO_SELF, 0.5f)
+        scaleX.duration = 1500
+        scaleX.repeatCount = android.view.animation.Animation.INFINITE
+        scaleX.repeatMode = android.view.animation.Animation.REVERSE
+        
+        val alpha = android.view.animation.AlphaAnimation(0.2f, 0f)
+        alpha.duration = 1500
+        alpha.repeatCount = android.view.animation.Animation.INFINITE
+        alpha.repeatMode = android.view.animation.Animation.REVERSE
+
+        val animSet = android.view.animation.AnimationSet(true)
+        animSet.addAnimation(scaleX)
+        animSet.addAnimation(alpha)
+        statusPulse.startAnimation(animSet)
+    }
+
+    private fun stopPulseAnimation() {
+        statusPulse.clearAnimation()
+        statusPulse.visibility = android.view.View.GONE
     }
 
     private fun isServiceRunning(serviceClass: Class<*>): Boolean {

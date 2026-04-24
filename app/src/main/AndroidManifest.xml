@@ -37,7 +37,7 @@
             android:name=".LockActivity"
             android:excludeFromRecents="true"
             android:launchMode="singleInstance"
-            android:theme="@style/Theme.AppLock.NoActionBar" />
+            android:theme="@style/Theme.AppLock.Transparent" />
 
         <activity
             android:name=".HistoryActivity"
