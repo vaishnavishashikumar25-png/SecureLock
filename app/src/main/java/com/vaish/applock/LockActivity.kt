@@ -36,6 +36,8 @@ class LockActivity : AppCompatActivity() {
     private var isOwnerRegistered: Boolean = false
     private var isProcessing = false
     private lateinit var faceNetModel: FaceNetModel
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var failSafeRunnable: Runnable? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,20 +48,7 @@ class LockActivity : AppCompatActivity() {
         mode = intent.getStringExtra("MODE") ?: "VERIFY"
         isOwnerRegistered = File(getExternalFilesDir(null), "owner_face.dat").exists()
 
-        if (mode == "STEALTH") {
-            binding.root.visibility = View.GONE // Hide layout completely
-            window.setDimAmount(0f) // Remove any dimming
-        } else if (mode == "REGISTER") {
-            binding.tvMessage.text = "Position face to register"
-            binding.btnUsePin.visibility = View.GONE
-            binding.btnUnlock.text = "Capture"
-        } else if (mode == "APP_UNLOCK") {
-            binding.tvMessage.text = "Unlock AppLock"
-            binding.btnUnlock.text = "Cancel"
-            binding.btnUsePin.text = "Use PIN"
-            // Ensure camera is visible for face unlock
-            binding.cameraCard.alpha = 1.0f
-        }
+        updateUIForMode()
 
         startScannerAnimation()
         cameraExecutor = Executors.newSingleThreadExecutor()
@@ -86,6 +75,58 @@ class LockActivity : AppCompatActivity() {
                 binding.cameraCard.alpha = 0.3f
             } else {
                 verifyPin()
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        mode = intent.getStringExtra("MODE") ?: "VERIFY"
+        
+        // Cancel any pending fail-safe timers from previous session
+        failSafeRunnable?.let { handler.removeCallbacks(it) }
+        
+        isProcessing = false
+        isOwnerRegistered = File(getExternalFilesDir(null), "owner_face.dat").exists()
+        
+        Log.d("LockActivity", "New intent received. Mode: $mode. Resetting state.")
+        updateUIForMode()
+        
+        if (allPermissionsGranted()) {
+            startCamera()
+        }
+    }
+
+    private fun updateUIForMode() {
+        if (mode == "STEALTH") {
+            binding.root.visibility = View.GONE
+            window.setDimAmount(0f)
+        } else {
+            binding.root.visibility = View.VISIBLE
+            window.setDimAmount(0.5f)
+            binding.cameraCard.alpha = 1.0f
+            binding.tilPin.visibility = View.GONE
+            binding.etPinEntry.text?.clear()
+            
+            when (mode) {
+                "REGISTER" -> {
+                    binding.tvMessage.text = "Position face to register"
+                    binding.btnUsePin.visibility = View.GONE
+                    binding.btnUnlock.text = "Capture"
+                }
+                "APP_UNLOCK" -> {
+                    binding.tvMessage.text = "Unlock AppLock"
+                    binding.btnUnlock.text = "Cancel"
+                    binding.btnUsePin.text = "Use PIN"
+                    binding.btnUsePin.visibility = View.VISIBLE
+                }
+                else -> { // VERIFY
+                    binding.tvMessage.text = "Identify Yourself"
+                    binding.btnUnlock.text = "Cancel"
+                    binding.btnUsePin.text = "Use PIN"
+                    binding.btnUsePin.visibility = View.VISIBLE
+                }
             }
         }
     }
@@ -136,9 +177,7 @@ class LockActivity : AppCompatActivity() {
             unlockSuccess()
         } else {
             binding.tilPin.error = "Incorrect PIN"
-            if (mode != "APP_UNLOCK") {
-                captureIntruderPhoto() // Secret capture
-            }
+            captureIntruderPhoto() // Secret capture for ANY failed attempt
         }
     }
 
@@ -202,16 +241,26 @@ class LockActivity : AppCompatActivity() {
                 cameraProvider.unbindAll()
                 
                 if (mode == "STEALTH") {
-                    // In stealth mode, bind analyzer to wait for a face
+                    // Start stealth monitoring
                     cameraProvider.bindToLifecycle(this, cameraSelector, imageCapture, imageAnalyzer)
                     
-                    // Timeout: if no face detected in 5 seconds, close to save battery
-                    binding.root.postDelayed({
-                        if (!isProcessing) {
-                            finish()
-                            overridePendingTransition(0, 0)
+                    // FAIL-SAFE: If no owner verified within 4 seconds, capture whatever is there
+                    failSafeRunnable = Runnable {
+                        if (!isProcessing && !isFinishing) {
+                            Log.d("LockActivity", "Stealth timeout: Capturing evidence anyway.")
+                            isProcessing = true
+                            
+                            // Capture the last frame we had
+                            captureIntruderPhoto(lastDetectedBitmap, 0)
+                            
+                            handler.postDelayed({
+                                stopCamera()
+                                finish()
+                                overridePendingTransition(0, 0)
+                            }, 1000)
                         }
-                    }, 5000)
+                    }
+                    handler.postDelayed(failSafeRunnable!!, 4000)
                 } else {
                     cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageCapture, imageAnalyzer)
                 }
@@ -227,16 +276,22 @@ class LockActivity : AppCompatActivity() {
     private var lastDetectedBitmap: Bitmap? = null
 
     private fun onFaceDetected(face: Face?, bitmap: Bitmap?, rotation: Int) {
+        if (bitmap != null) {
+            lastDetectedBitmap = bitmap
+        }
         lastDetectedFace = face
-        lastDetectedBitmap = bitmap
         
-        if (mode == "REGISTER" || isProcessing) {
+        if (mode == "REGISTER" || isProcessing || isFinishing) {
             return
         }
 
         if (face != null && bitmap != null) {
-            if (verifyFace(face, bitmap)) {
+            val isVerified = verifyFace(face, bitmap)
+            Log.d("LockActivity", "Face detected. Verified: $isVerified")
+            
+            if (isVerified) {
                 isProcessing = true
+                failSafeRunnable?.let { handler.removeCallbacks(it) }
                 stopCamera()
                 
                 if (mode == "APP_UNLOCK") {
@@ -257,20 +312,34 @@ class LockActivity : AppCompatActivity() {
                     overridePendingTransition(0, 0)
                 }
             } else {
-                Log.d("LockActivity", "Face match failed - possible intruder")
+                Log.d("LockActivity", "Intruder detected. Capture triggered.")
                 
-                if (mode == "APP_UNLOCK") return
+                if (mode == "APP_UNLOCK") {
+                    // Even in app unlock, we might want to log if it's NOT the owner
+                    // but we don't necessarily want to block them if they know the PIN (handled in verifyPin)
+                    // For now, just log the attempt if it's definitely not the owner
+                    captureIntruderPhoto(bitmap, rotation)
+                    return
+                }
 
                 isProcessing = true
-                // Pass rotation to capture logic
+                failSafeRunnable?.let { handler.removeCallbacks(it) }
                 captureIntruderPhoto(bitmap, rotation)
                 
                 if (mode == "STEALTH") {
                     binding.root.postDelayed({
                         stopCamera()
-                        finish()
-                        overridePendingTransition(0, 0)
-                    }, 500)
+                        if (!isFinishing) {
+                            finish()
+                            overridePendingTransition(0, 0)
+                        }
+                    }, 1500) // More time for IO
+                } else {
+                    // Reset processing after 5s to allow another attempt/capture
+                    binding.root.postDelayed({
+                        isProcessing = false
+                        Log.d("LockActivity", "Ready for next capture/verification")
+                    }, 5000)
                 }
             }
         }
@@ -300,7 +369,9 @@ class LockActivity : AppCompatActivity() {
         val distance = faceNetModel.compare(currentEmbedding, savedEmbedding)
         Log.d("LockActivity", "Face distance: $distance")
         
-        return distance < 1.1f // Increased threshold for Facenet 512 model
+        // Threshold: 1.0 is strict, 1.1 is standard.
+        // For security apps, we prefer slightly strict (1.05) to ensure intruders are logged.
+        return distance < 1.05f
     }
 
     private fun cropFace(bitmap: Bitmap, face: Face): Bitmap? {
@@ -342,31 +413,33 @@ class LockActivity : AppCompatActivity() {
         val photoFile = File(getExternalFilesDir(null), "intruder_${System.currentTimeMillis()}.jpg")
         
         if (bitmap != null) {
-            try {
-                // Correctly rotate the bitmap based on sensor orientation
-                val matrix = android.graphics.Matrix()
-                matrix.postRotate(rotationDegrees.toFloat())
-                // Also flip horizontally because it's the front camera
-                matrix.postScale(-1f, 1f, bitmap.width / 2f, bitmap.height / 2f)
-                
-                val rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-                
-                java.io.FileOutputStream(photoFile).use { out ->
-                    rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+            // Use background executor for image processing and saving
+            cameraExecutor.execute {
+                try {
+                    val matrix = android.graphics.Matrix()
+                    matrix.postRotate(rotationDegrees.toFloat())
+                    // Flip horizontally for front camera
+                    matrix.postScale(-1f, 1f, bitmap.width / 2f, bitmap.height / 2f)
+                    
+                    val rotatedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                    
+                    java.io.FileOutputStream(photoFile).use { out ->
+                        rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+                    }
+                    Log.d("LockActivity", "Intruder photo saved: ${photoFile.absolutePath}")
+                } catch (e: Exception) {
+                    Log.e("LockActivity", "Failed to save intruder bitmap", e)
                 }
-                Log.d("LockActivity", "Intruder photo saved successfully: ${photoFile.absolutePath}")
-            } catch (e: Exception) {
-                Log.e("LockActivity", "Failed to save rotated intruder bitmap", e)
             }
         } else {
-            // Fallback to standard capture
+            // Fallback to standard ImageCapture if no bitmap provided
             val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
-            imageCapture?.takePicture(outputOptions, ContextCompat.getMainExecutor(this), object : ImageCapture.OnImageSavedCallback {
+            imageCapture?.takePicture(outputOptions, cameraExecutor, object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                    Log.d("LockActivity", "Intruder photo saved via fallback: ${photoFile.absolutePath}")
+                    Log.d("LockActivity", "Intruder photo saved via ImageCapture: ${photoFile.absolutePath}")
                 }
                 override fun onError(exc: ImageCaptureException) {
-                    Log.e("LockActivity", "Photo capture fallback failed", exc)
+                    Log.e("LockActivity", "ImageCapture failed", exc)
                 }
             })
         }
@@ -400,6 +473,7 @@ class LockActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        failSafeRunnable?.let { handler.removeCallbacks(it) }
         cameraExecutor.shutdown()
     }
 
@@ -431,7 +505,9 @@ class LockActivity : AppCompatActivity() {
     private class FaceAnalyzer(private val listener: (Face?, Bitmap?, Int) -> Unit) : ImageAnalysis.Analyzer {
         private val detector = FaceDetection.getClient(
             FaceDetectorOptions.Builder()
-                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_FAST)
+                .setPerformanceMode(FaceDetectorOptions.PERFORMANCE_MODE_ACCURATE)
+                .setLandmarkMode(FaceDetectorOptions.LANDMARK_MODE_NONE)
+                .setClassificationMode(FaceDetectorOptions.CLASSIFICATION_MODE_NONE)
                 .build()
         )
 

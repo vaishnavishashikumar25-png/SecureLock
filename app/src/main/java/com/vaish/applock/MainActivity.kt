@@ -14,11 +14,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.material.card.MaterialCardView
-import com.google.android.material.switchmaterial.SwitchMaterial
+import com.google.android.material.materialswitch.MaterialSwitch
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var switchService: com.google.android.material.materialswitch.MaterialSwitch
+    private lateinit var switchService: MaterialSwitch
     private lateinit var ivStatus: ImageView
     private lateinit var tvStatusTitle: TextView
     private lateinit var tvStatusDesc: TextView
@@ -31,7 +31,7 @@ class MainActivity : AppCompatActivity() {
         
         // App-level PIN protection
         val sharedPrefs = getSharedPreferences("AppLockPrefs", Context.MODE_PRIVATE)
-        val savedPin = sharedPrefs.getString("AppPin", null)
+        val savedPin = sharedPrefs.getString("SecurityPin", null)
         
         if (savedPin != null && !isAuthenticated) {
             val intent = Intent(this, LockActivity::class.java)
@@ -80,8 +80,25 @@ class MainActivity : AppCompatActivity() {
             registerOwner()
         }
 
+        findViewById<MaterialCardView>(R.id.btnSetPin).setOnClickListener {
+            startActivity(Intent(this, PinSetupActivity::class.java))
+        }
+
         findViewById<MaterialCardView>(R.id.btnViewLogs).setOnClickListener {
             startActivity(Intent(this, HistoryActivity::class.java))
+        }
+
+        findViewById<MaterialCardView>(R.id.btnTestStealth).setOnClickListener {
+            if (!Settings.canDrawOverlays(this)) {
+                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+                startActivity(intent)
+                Toast.makeText(this, "Please allow 'Display over other apps' first", Toast.LENGTH_LONG).show()
+            } else {
+                val intent = Intent(this, LockActivity::class.java)
+                intent.putExtra("MODE", "STEALTH")
+                startActivity(intent)
+                Toast.makeText(this, "Stealth check started in background...", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 

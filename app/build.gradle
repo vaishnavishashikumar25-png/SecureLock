@@ -56,11 +56,14 @@ dependencies {
     implementation "androidx.camera:camera-lifecycle:${camerax_version}"
     implementation "androidx.camera:camera-view:${camerax_version}"
 
-    // Use ML Kit and its own LiteRT to avoid manual conflicts
+    // Use ML Kit for Face Detection
     implementation 'com.google.mlkit:face-detection:16.1.7'
     
-    // Instead of org.tensorflow, use the new LiteRT artifacts that ML Kit uses
-    implementation 'com.google.ai.edge.litert:litert:1.0.1'
+    // Use the official TFLite runtime for custom models
+    implementation 'org.tensorflow:tensorflow-lite:2.16.1'
+
+    // Charts for Analytics
+    implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'
 
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'

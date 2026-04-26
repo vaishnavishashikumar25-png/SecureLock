@@ -2,6 +2,7 @@ package com.vaish.applock
 
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
@@ -11,12 +12,19 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.github.mikephil.charting.charts.PieChart
+import com.github.mikephil.charting.data.PieData
+import com.github.mikephil.charting.data.PieDataSet
+import com.github.mikephil.charting.data.PieEntry
+import com.github.mikephil.charting.utils.ColorTemplate
 import com.vaish.applock.databinding.ActivityHistoryBinding
 import com.vaish.applock.databinding.ItemIntruderBinding
 import com.vaish.applock.databinding.ItemUsageLogBinding
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
+import kotlin.collections.HashMap
+import kotlin.collections.HashSet
 
 class HistoryActivity : AppCompatActivity() {
 
@@ -33,6 +41,43 @@ class HistoryActivity : AppCompatActivity() {
 
         binding.rvIntruders.layoutManager = LinearLayoutManager(this)
         refreshList()
+    }
+
+    private fun setupPieChart(usageLogs: List<UsageLogEntry>) {
+        if (usageLogs.isEmpty()) {
+            binding.cardAnalytics.visibility = View.GONE
+            return
+        }
+        binding.cardAnalytics.visibility = View.VISIBLE
+
+        val appCountMap = HashMap<String, Float>()
+        usageLogs.forEach { log ->
+            val appName = try {
+                val pm = packageManager
+                pm.getApplicationLabel(pm.getApplicationInfo(log.packageName, 0)).toString()
+            } catch (e: Exception) {
+                log.packageName.split(".").last()
+            }
+            appCountMap[appName] = (appCountMap[appName] ?: 0f) + 1f
+        }
+
+        val entries = ArrayList<PieEntry>()
+        appCountMap.forEach { (name, count) ->
+            entries.add(PieEntry(count, name))
+        }
+
+        val dataSet = PieDataSet(entries, "")
+        dataSet.colors = ColorTemplate.MATERIAL_COLORS.toList()
+        dataSet.valueTextColor = Color.BLACK
+        dataSet.valueTextSize = 12f
+
+        val data = PieData(dataSet)
+        binding.pieChart.data = data
+        binding.pieChart.description.isEnabled = false
+        binding.pieChart.centerText = "Targeted Apps"
+        binding.pieChart.setCenterTextSize(16f)
+        binding.pieChart.animateY(1400)
+        binding.pieChart.invalidate()
     }
 
     private class IntruderAdapter(
@@ -141,6 +186,8 @@ class HistoryActivity : AppCompatActivity() {
             val intruderList = files.map { Intruder(it.absolutePath, it.lastModified()) }
             binding.rvIntruders.adapter = IntruderAdapter(intruderList, usageLogs)
         }
+        
+        setupPieChart(usageLogs)
     }
 
     data class UsageLogEntry(val packageName: String, val timestamp: Long, val duration: Long)
