@@ -20,6 +20,8 @@ import com.google.mlkit.vision.face.Face
 import com.google.mlkit.vision.face.FaceDetection
 import com.google.mlkit.vision.face.FaceDetectorOptions
 import com.google.mlkit.vision.face.FaceLandmark
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
 import com.vaish.applock.databinding.ActivityLockBinding
 import java.io.File
 import java.util.concurrent.ExecutorService
@@ -36,6 +38,9 @@ class LockActivity : AppCompatActivity() {
     private var isOwnerRegistered: Boolean = false
     private var isProcessing = false
     private lateinit var faceNetModel: FaceNetModel
+    private lateinit var riskEngine: RiskEngine
+    private var riskLevel: String = "LOW"
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
     private var failSafeRunnable: Runnable? = null
 
@@ -45,10 +50,15 @@ class LockActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         faceNetModel = FaceNetModel(this)
+        riskEngine = RiskEngine(this)
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        
         mode = intent.getStringExtra("MODE") ?: "VERIFY"
+        riskLevel = intent.getStringExtra("RISK_LEVEL") ?: "LOW"
         isOwnerRegistered = File(getExternalFilesDir(null), "owner_face.dat").exists()
 
         updateUIForMode()
+        applyRiskLevelAuth()
 
         startScannerAnimation()
         cameraExecutor = Executors.newSingleThreadExecutor()
@@ -109,22 +119,23 @@ class LockActivity : AppCompatActivity() {
             binding.tilPin.visibility = View.GONE
             binding.etPinEntry.text?.clear()
             
+
             when (mode) {
                 "REGISTER" -> {
-                    binding.tvMessage.text = "Position face to register"
+                    binding.tvMessage.text = getString(R.string.update_face)
                     binding.btnUsePin.visibility = View.GONE
-                    binding.btnUnlock.text = "Capture"
+                    binding.btnUnlock.text = getString(R.string.update_face) // or a new string like "Capture"
                 }
                 "APP_UNLOCK" -> {
-                    binding.tvMessage.text = "Unlock AppLock"
-                    binding.btnUnlock.text = "Cancel"
-                    binding.btnUsePin.text = "Use PIN"
+                    binding.tvMessage.text = getString(R.string.app_name)
+                    binding.btnUnlock.text = getString(R.string.cancel)
+                    binding.btnUsePin.text = getString(R.string.use_pin)
                     binding.btnUsePin.visibility = View.VISIBLE
                 }
                 else -> { // VERIFY
-                    binding.tvMessage.text = "Identify Yourself"
-                    binding.btnUnlock.text = "Cancel"
-                    binding.btnUsePin.text = "Use PIN"
+                    binding.tvMessage.text = getString(R.string.auth_face)
+                    binding.btnUnlock.text = getString(R.string.cancel)
+                    binding.btnUsePin.text = getString(R.string.use_pin)
                     binding.btnUsePin.visibility = View.VISIBLE
                 }
             }
@@ -160,10 +171,11 @@ class LockActivity : AppCompatActivity() {
         val savedPin = sharedPrefs.getString("OwnerPin", sharedPrefs.getString("SecurityPin", null))
 
         if (savedPin == null) {
-            Toast.makeText(this, "No PIN set. Setup PIN in main app.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.no_pin_set), Toast.LENGTH_SHORT).show()
         } else if (enteredPin == savedPin) {
+            // PIN is the ultimate override, but we log the success to reset risk
             isProcessing = true
-            Toast.makeText(this, "PIN Verified", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.pin_verified), Toast.LENGTH_SHORT).show()
             
             if (mode == "APP_UNLOCK") {
                 setResult(RESULT_OK)
@@ -171,13 +183,12 @@ class LockActivity : AppCompatActivity() {
                 return
             }
 
-            // Background check: Is this the owner using the PIN?
             checkIfOwnerUsingPin()
-            
             unlockSuccess()
         } else {
             binding.tilPin.error = "Incorrect PIN"
-            captureIntruderPhoto() // Secret capture for ANY failed attempt
+            riskEngine.recordFailedAttempt() // Increment risk on failure
+            captureIntruderPhoto() 
         }
     }
 
@@ -367,11 +378,16 @@ class LockActivity : AppCompatActivity() {
         val savedEmbedding = savedEmbeddingString.split(",").map { it.toFloat() }.toFloatArray()
         
         val distance = faceNetModel.compare(currentEmbedding, savedEmbedding)
-        Log.d("LockActivity", "Face distance: $distance")
+        Log.d("LockActivity", "Face distance: $distance (Risk: $riskLevel)")
         
-        // Threshold: 1.0 is strict, 1.1 is standard.
-        // For security apps, we prefer slightly strict (1.05) to ensure intruders are logged.
-        return distance < 1.05f
+        // Dynamic Threshold based on Risk Level
+        val threshold = when(riskLevel) {
+            "HIGH" -> 0.95f   // Very strict
+            "MEDIUM" -> 1.05f // Standard
+            else -> 1.15f     // Lenient for low risk
+        }
+        
+        return distance < threshold
     }
 
     private fun cropFace(bitmap: Bitmap, face: Face): Bitmap? {
@@ -410,7 +426,22 @@ class LockActivity : AppCompatActivity() {
     }
 
     private fun captureIntruderPhoto(bitmap: Bitmap? = null, rotationDegrees: Int = 0) {
-        val photoFile = File(getExternalFilesDir(null), "intruder_${System.currentTimeMillis()}.jpg")
+        val timestamp = System.currentTimeMillis()
+        
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                saveIntruderData(bitmap, rotationDegrees, timestamp, location?.latitude, location?.longitude)
+            }.addOnFailureListener {
+                saveIntruderData(bitmap, rotationDegrees, timestamp, null, null)
+            }
+        } else {
+            saveIntruderData(bitmap, rotationDegrees, timestamp, null, null)
+        }
+    }
+
+    private fun saveIntruderData(bitmap: Bitmap?, rotationDegrees: Int, timestamp: Long, lat: Double?, lon: Double?) {
+        val locSuffix = if (lat != null && lon != null) "_loc_${lat}_${lon}" else ""
+        val photoFile = File(getExternalFilesDir(null), "intruder_${timestamp}${locSuffix}.jpg")
         
         if (bitmap != null) {
             // Use background executor for image processing and saving
@@ -445,7 +476,28 @@ class LockActivity : AppCompatActivity() {
         }
     }
 
+    private fun applyRiskLevelAuth() {
+        when (riskLevel) {
+            "HIGH" -> {
+                binding.cameraCard.setStrokeColor(ContextCompat.getColorStateList(this, R.color.error))
+                binding.tvMessage.text = getString(R.string.risk_high)
+                binding.tvMessage.setTextColor(ContextCompat.getColor(this, R.color.error))
+            }
+            "MEDIUM" -> {
+                binding.cameraCard.setStrokeColor(ContextCompat.getColorStateList(this, R.color.amber_500))
+                binding.tvMessage.text = getString(R.string.risk_medium)
+                binding.tvMessage.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+            }
+            else -> {
+                binding.cameraCard.setStrokeColor(ContextCompat.getColorStateList(this, R.color.primary))
+                binding.tvMessage.text = getString(R.string.auth_face)
+                binding.tvMessage.setTextColor(ContextCompat.getColor(this, R.color.text_primary))
+            }
+        }
+    }
+
     private fun unlockSuccess() {
+        riskEngine.resetFailedAttempts()
         val targetApp = intent.getStringExtra("TARGET_PACKAGE")
         if (targetApp != null) {
             AppLockService.lastUnlockedApp = targetApp
@@ -499,7 +551,11 @@ class LockActivity : AppCompatActivity() {
 
     companion object {
         private const val REQUEST_CODE_PERMISSIONS = 10
-        private val REQUIRED_PERMISSIONS = arrayOf(android.Manifest.permission.CAMERA)
+        private val REQUIRED_PERMISSIONS = arrayOf(
+            android.Manifest.permission.CAMERA,
+            android.Manifest.permission.ACCESS_FINE_LOCATION,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        )
     }
 
     private class FaceAnalyzer(private val listener: (Face?, Bitmap?, Int) -> Unit) : ImageAnalysis.Analyzer {

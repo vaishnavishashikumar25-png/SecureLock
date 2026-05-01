@@ -3,10 +3,29 @@
     <string name="request_permissions">Grant Permissions</string>
     <string name="lock_message">This app is locked. Scan face to enter.</string>
 
-    <string name="status_active">Protection Active</string>
+    <string name="status_active">System Protected</string>
     <string name="status_disabled">Protection Disabled</string>
-    <string name="status_desc_active">Your apps are being monitored</string>
-    <string name="status_desc_disabled">Tap to enable service</string>
+    <string name="status_desc_active">Monitoring background activity</string>
+    <string name="status_desc_disabled">Tap to enable security</string>
+
+
+    <string name="behavioral_lock">Behavioral Lock</string>
+    <string name="behavioral_lock_desc">AI-powered lock patterns</string>
+
+    <string name="dark_mode">Dark Mode</string>
+    <string name="dark_mode_desc">Toggle system appearance</string>
+
+    <string name="analytics_dashboard">Analytics Dashboard</string>
+    <string name="usage_intensity">App Usage Intensity</string>
+    <string name="time_protected">Time Protected</string>
+    <string name="apps_locked">Apps Locked</string>
+    <string name="security_events_trend">Security Events Trend</string>
+
+    <string name="quick_actions">Quick Actions</string>
+    <string name="update_face">Update Face</string>
+    <string name="intruder_logs">Intruder Logs</string>
+    <string name="set_security_pin">Set Security PIN</string>
+    <string name="test_stealth">Test Stealth Capture</string>
 
     <string name="security_settings">Security Settings</string>
     <string name="security_pin">Security PIN</string>
@@ -16,8 +35,29 @@
     <string name="protected_apps">Protected Applications</string>
     <string name="intruder_history">Intruder History</string>
 
-    <string name="auth_face">Authenticating Face…</string>
-    <string name="auth_pin">Enter PIN to Unlock</string>
+    <string name="auth_face">Identify Yourself</string>
+    <string name="auth_pin">Enter PIN</string>
     <string name="cancel">Cancel</string>
     <string name="use_pin">Use PIN</string>
+    <string name="risk_high">High Risk: Strict Auth Required</string>
+    <string name="risk_medium">Elevated Risk: Verify Identity</string>
+    <string name="pin_verified">PIN Verified</string>
+    <string name="no_pin_set">No PIN set. Setup PIN in main app.</string>
+
+    <string name="whitelisted_apps">Whitelisted Applications</string>
+    <string name="fetching_address">Fetching address...</string>
+    <string name="location_format">Lat: %1$.4f, Lon: %2$.4f</string>
+    <string name="duration_seconds">%1$ds</string>
+    <string name="duration_at_time">%1$ds at %2$s</string>
+
+    <string name="network_security">Network Security</string>
+    <string name="risk_score">Risk Score: %1$d/100</string>
+    <string name="network_safe">Secure Connection</string>
+    <string name="network_unsafe">Unsecured Network Detected</string>
+    <string name="no_wifi">No WiFi Connected</string>
+    <string name="scanning_network">Scanning network...</string>
+    <string name="encrypted">Encrypted</string>
+    <string name="open_network">Open Network</string>
+    <string name="signal_strength">Signal: %1$d%%</string>
+    <string name="connect_wifi_scan">Connect to WiFi to scan</string>
 </resources>

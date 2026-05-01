@@ -8,10 +8,14 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.vaish.applock.databinding.ActivityAppListBinding
 import com.vaish.applock.databinding.ItemAppBinding
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class AppInfo(
     val name: String,
@@ -24,43 +28,76 @@ class AppListActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAppListBinding
     private lateinit var adapter: AppAdapter
+    private var isWhitelistMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityAppListBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+
+
         binding.rvApps.layoutManager = LinearLayoutManager(this)
         loadApps()
     }
 
     private fun loadApps() {
-        val pm = packageManager
-        val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-        val sharedPrefs = getSharedPreferences("AppLockPrefs", Context.MODE_PRIVATE)
-        val lockedApps = sharedPrefs.getStringSet("LockedPackages", emptySet()) ?: emptySet()
+        lifecycleScope.launch {
+            val appList = withContext(Dispatchers.Default) {
+                val pm = packageManager
+                val apps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+                val sharedPrefs = getSharedPreferences("AppLockPrefs", Context.MODE_PRIVATE)
+                
+                val prefKey = "LockedPackages"
+                val selectedApps = sharedPrefs.getStringSet(prefKey, emptySet()) ?: emptySet()
 
-        val appList = apps.filter { 
-            (it.flags and ApplicationInfo.FLAG_SYSTEM) == 0 || it.packageName == "com.android.settings"
-        }.map { 
-            AppInfo(
-                it.loadLabel(pm).toString(),
-                it.packageName,
-                it.loadIcon(pm),
-                lockedApps.contains(it.packageName)
-            )
-        }.sortedBy { it.name }
-
-        adapter = AppAdapter(appList) { appInfo, isChecked ->
-            val currentLocked = sharedPrefs.getStringSet("LockedPackages", emptySet())?.toMutableSet() ?: mutableSetOf()
-            if (isChecked) {
-                currentLocked.add(appInfo.packageName)
-            } else {
-                currentLocked.remove(appInfo.packageName)
+                apps.map {
+                    AppInfo(
+                        it.loadLabel(pm).toString(),
+                        it.packageName,
+                        it.loadIcon(pm),
+                        selectedApps.contains(it.packageName)
+                    )
+                }.sortedBy { it.name }
             }
-            sharedPrefs.edit().putStringSet("LockedPackages", currentLocked).apply()
+
+            val sharedPrefs = getSharedPreferences("AppLockPrefs", Context.MODE_PRIVATE)
+            val prefKey = "LockedPackages"
+
+            adapter = AppAdapter(appList) { appInfo, isChecked ->
+                val currentSelected = sharedPrefs.getStringSet(prefKey, emptySet())?.toMutableSet() ?: mutableSetOf()
+                if (isChecked) {
+                    currentSelected.add(appInfo.packageName)
+                } else {
+                    currentSelected.remove(appInfo.packageName)
+                }
+                sharedPrefs.edit().putStringSet(prefKey, currentSelected).apply()
+                
+                // Update Select All switch state without triggering listener
+                binding.switchSelectAll.setOnCheckedChangeListener(null)
+                binding.switchSelectAll.isChecked = appList.all { it.isLocked }
+                setupSelectAllListener(appList, prefKey)
+            }
+            binding.rvApps.adapter = adapter
+
+            // Initialize Select All switch
+            binding.switchSelectAll.isChecked = appList.all { it.isLocked }
+            setupSelectAllListener(appList, prefKey)
         }
-        binding.rvApps.adapter = adapter
+    }
+
+    private fun setupSelectAllListener(appList: List<AppInfo>, prefKey: String) {
+        val sharedPrefs = getSharedPreferences("AppLockPrefs", Context.MODE_PRIVATE)
+        binding.switchSelectAll.setOnCheckedChangeListener { _, isChecked ->
+            appList.forEach { it.isLocked = isChecked }
+            val newSelection = if (isChecked) {
+                appList.map { it.packageName }.toSet()
+            } else {
+                emptySet()
+            }
+            sharedPrefs.edit().putStringSet(prefKey, newSelection).apply()
+            adapter.notifyDataSetChanged()
+        }
     }
 
     class AppAdapter(private val apps: List<AppInfo>, private val onLockChanged: (AppInfo, Boolean) -> Unit) :
@@ -79,9 +116,9 @@ class AppListActivity : AppCompatActivity() {
                 tvAppName.text = app.name
                 tvPackageName.text = app.packageName
                 ivAppIcon.setImageDrawable(app.icon)
-                cbLock.setOnCheckedChangeListener(null)
-                cbLock.isChecked = app.isLocked
-                cbLock.setOnCheckedChangeListener { _, isChecked ->
+                switchLock.setOnCheckedChangeListener(null)
+                switchLock.isChecked = app.isLocked
+                switchLock.setOnCheckedChangeListener { _, isChecked ->
                     app.isLocked = isChecked
                     onLockChanged(app, isChecked)
                 }

@@ -34,28 +34,24 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textAppearance="@style/TextAppearance.Material3.BodyLarge"
-                android:textStyle="bold" />
+                android:textStyle="bold"
+                android:textColor="@color/text_primary" />
 
             <TextView
                 android:id="@+id/tvPackageName"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textAppearance="@style/TextAppearance.Material3.BodySmall"
-                android:alpha="0.7" />
+                android:textColor="@color/text_secondary"
+                android:textStyle="bold"
+                android:alpha="0.8" />
         </LinearLayout>
 
-        <com.google.android.material.checkbox.MaterialCheckBox
-            android:id="@+id/cbLock"
+        <com.google.android.material.materialswitch.MaterialSwitch
+            android:id="@+id/switchLock"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            app:buttonIcon="@null"
-            android:button="@null"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            app:useMaterialThemeColors="true"
-            android:minWidth="0dp"
-            android:minHeight="0dp"
-            android:padding="8dp"
-            android:drawableEnd="@drawable/ic_lock_selector" />
+            app:useMaterialThemeColors="true" />
 
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

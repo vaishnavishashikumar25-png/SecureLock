@@ -3,12 +3,12 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5">
+    android:background="@color/background">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
+        android:background="@color/background"
         app:elevation="0dp">
 
         <com.google.android.material.appbar.MaterialToolbar
@@ -17,6 +17,7 @@
             android:layout_height="?attr/actionBarSize"
             app:title="Security PIN"
             app:navigationIcon="@android:drawable/ic_menu_revert"
+            app:titleCentered="true"
             app:titleTextAppearance="@style/TextAppearance.Material3.TitleLarge" />
     </com.google.android.material.appbar.AppBarLayout>
 
@@ -33,7 +34,7 @@
             android:layout_height="80dp"
             android:layout_marginBottom="24dp"
             android:src="@android:drawable/ic_dialog_dialer"
-            app:tint="?attr/colorPrimary" />
+            app:tint="@color/primary" />
 
         <TextView
             android:id="@+id/tvPinTitle"
@@ -41,6 +42,7 @@
             android:layout_height="wrap_content"
             android:text="Create Security PIN"
             android:textAppearance="@style/TextAppearance.Material3.HeadlineMedium"
+            android:textColor="@color/text_primary"
             android:textStyle="bold" />
 
         <TextView
@@ -49,18 +51,20 @@
             android:layout_marginBottom="32dp"
             android:text="Used as a fallback if Face ID fails"
             android:textAppearance="@style/TextAppearance.Material3.BodyMedium"
-            android:alpha="0.7" />
+            android:textColor="@color/text_secondary"
+            android:textStyle="bold"
+            android:alpha="0.8" />
 
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="24dp"
             android:hint="4-6 Digit PIN"
-            app:boxBackgroundColor="@android:color/white"
-            app:boxCornerRadiusBottomEnd="12dp"
-            app:boxCornerRadiusBottomStart="12dp"
-            app:boxCornerRadiusTopEnd="12dp"
-            app:boxCornerRadiusTopStart="12dp"
+            app:boxBackgroundColor="@color/surface"
+            app:boxCornerRadiusBottomEnd="16dp"
+            app:boxCornerRadiusBottomStart="16dp"
+            app:boxCornerRadiusTopEnd="16dp"
+            app:boxCornerRadiusTopStart="16dp"
             app:endIconMode="password_toggle"
             app:helperText="Digits only">
 
@@ -72,15 +76,19 @@
                 android:inputType="numberPassword"
                 android:letterSpacing="0.2"
                 android:maxLength="6"
+                android:textColor="@color/text_primary"
+                android:textStyle="bold"
                 android:textSize="24sp" />
         </com.google.android.material.textfield.TextInputLayout>
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSavePin"
             android:layout_width="match_parent"
-            android:layout_height="56dp"
+            android:layout_height="64dp"
             android:text="Save PIN"
-            app:cornerRadius="12dp" />
+            android:textStyle="bold"
+            android:textSize="18sp"
+            app:cornerRadius="20dp" />
 
     </LinearLayout>
 
