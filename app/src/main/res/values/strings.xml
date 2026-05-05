@@ -25,7 +25,8 @@
     <string name="update_face">Update Face</string>
     <string name="intruder_logs">Intruder Logs</string>
     <string name="set_security_pin">Set Security PIN</string>
-    <string name="test_stealth">Test Stealth Capture</string>
+    <string name="test_stealth">Test Stealth Monitoring</string>
+    <string name="test_intruder">Test Intruder Capture</string>
 
     <string name="security_settings">Security Settings</string>
     <string name="security_pin">Security PIN</string>

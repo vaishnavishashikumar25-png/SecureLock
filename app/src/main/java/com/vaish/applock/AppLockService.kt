@@ -99,10 +99,14 @@ class AppLockService : Service() {
         // Cleanup Usage Logs
         val sharedPrefs = getSharedPreferences("AppLockPrefs", Context.MODE_PRIVATE)
         val logStrings = sharedPrefs.getStringSet("IntruderUsageLogs", emptySet()) ?: emptySet()
-        val newLogs = logStrings.filter { log ->
-            val parts = log.split(" | ")
-            parts.size == 3 && parts[1].toLong() > sevenDaysAgo
-        }.toSet()
+                val newLogs = logStrings.filter { log ->
+                    try {
+                        val parts = log.split("|").map { it.trim() }
+                        parts.size >= 3 && (parts[1].toLongOrNull() ?: 0L) > sevenDaysAgo
+                    } catch (e: Exception) {
+                        false
+                    }
+                }.toSet()
         sharedPrefs.edit().putStringSet("IntruderUsageLogs", newLogs).apply()
     }
 

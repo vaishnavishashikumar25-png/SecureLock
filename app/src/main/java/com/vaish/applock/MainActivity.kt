@@ -334,6 +334,22 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(this, HistoryActivity::class.java))
         }
 
+        findViewById<MaterialCardView>(R.id.btnTestIntruder).setOnClickListener {
+            val intent = Intent(this, LockActivity::class.java)
+            intent.putExtra("MODE", "STEALTH")
+            intent.putExtra("TEST_MODE", true)
+            startActivity(intent)
+            Toast.makeText(this, "Simulating intruder... Keep camera active", Toast.LENGTH_SHORT).show()
+        }
+
+        findViewById<MaterialCardView>(R.id.btnTestIntruder).setOnClickListener {
+            val intent = Intent(this, LockActivity::class.java)
+            intent.putExtra("MODE", "STEALTH")
+            intent.putExtra("TEST_MODE", true)
+            startActivity(intent)
+            Toast.makeText(this, "Simulating intruder... Keep camera active", Toast.LENGTH_SHORT).show()
+        }
+
 
 
         findViewById<MaterialCardView>(R.id.btnTestStealth).setOnClickListener {

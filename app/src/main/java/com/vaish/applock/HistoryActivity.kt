@@ -224,14 +224,27 @@ class HistoryActivity : AppCompatActivity() {
         Log.d("HistoryActivity", "Found ${logStrings.size} usage logs")
 
         val usageLogs = logStrings.mapNotNull { log ->
-            val parts = log.split(" | ")
-            if (parts.size == 3) {
-                UsageLogEntry(parts[0], parts[1].toLong(), parts[2].toLong())
-            } else {
-                Log.e("HistoryActivity", "Invalid log format: $log")
+            try {
+                // More robust splitting
+                val parts = log.split("|").map { it.trim() }
+                if (parts.size >= 3) {
+                    val pkg = parts[0]
+                    val ts = parts[1].toLongOrNull() ?: 0L
+                    val dur = parts[2].toLongOrNull() ?: 0L
+                    if (pkg.isNotEmpty() && ts > 0) {
+                        UsageLogEntry(pkg, ts, dur)
+                    } else null
+                } else {
+                    Log.e("HistoryActivity", "Invalid log parts count: ${parts.size} for log: $log")
+                    null
+                }
+            } catch (e: Exception) {
+                Log.e("HistoryActivity", "Error parsing log: $log", e)
                 null
             }
         }.sortedByDescending { it.timestamp }
+
+        Log.d("HistoryActivity", "Successfully parsed ${usageLogs.size} usage logs")
 
         // Populate Top Usage Logs
         binding.llAllUsageLogs.removeAllViews()
